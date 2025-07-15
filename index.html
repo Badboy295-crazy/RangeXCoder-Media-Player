@@ -71,6 +71,7 @@
       display: flex;
       align-items: center;
       justify-content: center;
+      flex-direction: column;
     }
 
     .dark-mode .video-container {
@@ -83,12 +84,16 @@
       height: 100%;
       border: none;
       display: block;
+      border-radius: 8px;
     }
 
     #loadingSpinner {
       position: absolute;
       z-index: 10;
       text-align: center;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
     }
 
     .back-button {
@@ -101,10 +106,102 @@
       border-radius: 6px;
       font-weight: 500;
       transition: background-color 0.3s;
+      cursor: pointer;
     }
 
     .back-button:hover {
       background-color: #9f1239;
+    }
+
+    /* Forward/Backward buttons */
+    .seek-controls {
+      margin-top: 10px;
+      display: flex;
+      justify-content: center;
+      gap: 1rem;
+      user-select: none;
+      flex-wrap: wrap;
+    }
+
+    .seek-button, .fullscreen-button, .download-button {
+      background-color: var(--primary-color);
+      border: none;
+      color: white;
+      font-size: 1.4rem;
+      padding: 0.5rem 1.2rem;
+      border-radius: 6px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
+      transition: background-color 0.3s;
+      white-space: nowrap;
+    }
+
+    .seek-button:hover, .fullscreen-button:hover, .download-button:hover {
+      background-color: #3730a3;
+    }
+
+    @media (max-width: 600px) {
+      .seek-button, .fullscreen-button, .download-button {
+        font-size: 1.1rem;
+        padding: 0.4rem 0.8rem;
+      }
+    }
+
+    /* Download modal styles */
+    #downloadModal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.8);
+      color: white;
+      z-index: 2000;
+      justify-content: center;
+      align-items: center;
+      flex-direction: column;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    #downloadModalContent {
+      background: #1e293b;
+      padding: 20px 30px;
+      border-radius: 10px;
+      text-align: center;
+      max-width: 400px;
+      width: 90%;
+    }
+
+    #downloadModalContent h3 {
+      margin-bottom: 1rem;
+    }
+
+    #downloadModalContent progress {
+      width: 100%;
+      height: 20px;
+      border-radius: 5px;
+      appearance: none;
+      margin-bottom: 1rem;
+    }
+
+    #downloadModalContent button {
+      margin-top: 10px;
+      padding: 10px 20px;
+      font-size: 16px;
+      border-radius: 6px;
+      border: none;
+      cursor: pointer;
+    }
+
+    #saveFileBtn {
+      background-color: #10b981;
+      color: white;
+      display: none;
+    }
+
+    #cancelDownloadBtn {
+      background-color: #ef4444;
+      color: white;
     }
   </style>
 
@@ -130,17 +227,59 @@
     </div>
   </div>
 
+  <!-- Controls: seek + fullscreen + download -->
+  <div class="seek-controls" id="seekControls" style="display:none;">
+    <button class="seek-button" id="backwardBtn" title="Backward 10 seconds">
+      <i class="ri-arrow-left-line"></i> 10 sec Back
+    </button>
+    <button class="seek-button" id="forwardBtn" title="Forward 10 seconds">
+      10 sec Forward <i class="ri-arrow-right-line"></i>
+    </button>
+    <button class="fullscreen-button" id="fullscreenBtn" title="Toggle Fullscreen">
+      <i class="ri-fullscreen-line"></i> Fullscreen
+    </button>
+    <button class="download-button" id="downloadBtn" title="Download Video" style="display:none;">
+      <i class="ri-download-line"></i> Download
+    </button>
+  </div>
+
   <!-- Back Button -->
   <button class="back-button" onclick="goBack()">Back to Lectures</button>
+
+  <!-- Download Modal -->
+  <div id="downloadModal">
+    <div id="downloadModalContent">
+      <h3>Downloading...</h3>
+      <div id="spinner">
+        <div class="spinner-border text-light" style="width: 3rem; height: 3rem;" role="status">
+          <span class="visually-hidden">Loading...</span>
+        </div>
+      </div>
+      <progress id="progressBar" value="0" max="100"></progress>
+      <p id="progressText">0%</p>
+      <button id="saveFileBtn">Save File</button>
+      <button id="cancelDownloadBtn">Cancel</button>
+    </div>
+  </div>
 
   <script>
     const params = new URLSearchParams(window.location.search);
     const title = params.get('title') || 'Video';
-    const url = params.get('url') || '';
+    let url = params.get('url') || '';
+    const base64Video = params.get('video') || '';
 
     document.getElementById('videoTitle').innerText = title;
     const container = document.getElementById('playerContainer');
     const spinner = document.getElementById('loadingSpinner');
+    const seekControls = document.getElementById('seekControls');
+    const downloadBtn = document.getElementById('downloadBtn');
+    const fullscreenBtn = document.getElementById('fullscreenBtn');
+    const downloadModal = document.getElementById('downloadModal');
+    const progressBar = document.getElementById('progressBar');
+    const progressText = document.getElementById('progressText');
+    const saveFileBtn = document.getElementById('saveFileBtn');
+    const cancelDownloadBtn = document.getElementById('cancelDownloadBtn');
+    const spinnerModal = document.getElementById('spinner');
 
     function toggleTheme() {
       document.body.classList.toggle('dark-mode');
@@ -154,11 +293,169 @@
       window.history.back();
     }
 
+    // Decode Base64 video if provided
+    if (!url && base64Video) {
+      try {
+        url = atob(base64Video);
+      } catch (e) {
+        console.error('Invalid base64 video param');
+        container.innerHTML = "<p>Invalid video URL.</p>";
+      }
+    }
+
+    let video;  // video element reference
+    let downloadController;
+    let downloadedBlob;
+
+    function setupSeekControls() {
+      const forwardBtn = document.getElementById('forwardBtn');
+      const backwardBtn = document.getElementById('backwardBtn');
+
+      forwardBtn.addEventListener('click', () => {
+        if (!video) return;
+        video.currentTime = Math.min(video.duration, video.currentTime + 10);
+      });
+
+      backwardBtn.addEventListener('click', () => {
+        if (!video) return;
+        video.currentTime = Math.max(0, video.currentTime - 10);
+      });
+    }
+
+    function setupFullscreen() {
+      fullscreenBtn.addEventListener('click', () => {
+        if (!video) return;
+
+        if (!document.fullscreenElement) {
+          if (container.requestFullscreen) {
+            container.requestFullscreen();
+          } else if (container.mozRequestFullScreen) {
+            container.mozRequestFullScreen();
+          } else if (container.webkitRequestFullscreen) {
+            container.webkitRequestFullscreen();
+          } else if (container.msRequestFullscreen) {
+            container.msRequestFullscreen();
+          }
+        } else {
+          if (document.exitFullscreen) {
+            document.exitFullscreen();
+          }
+        }
+      });
+    }
+
+    function setupDownload() {
+      if (!video || !video.src) return;
+
+      // Show download button only if direct video URL (mp4/webm/ogg)
+      if (url.match(/\.(mp4|webm|ogg)$/i)) {
+        downloadBtn.style.display = 'flex';
+
+        downloadBtn.addEventListener('click', () => {
+          startDownload(url);
+        });
+      }
+    }
+
+    async function startDownload(downloadUrl) {
+      progressBar.value = 0;
+      progressText.textContent = '0%';
+      saveFileBtn.style.display = 'none';
+      spinnerModal.style.display = 'block';
+
+      downloadModal.style.display = 'flex';
+
+      downloadController = new AbortController();
+      const signal = downloadController.signal;
+
+      try {
+        const response = await fetch(downloadUrl, { signal });
+
+        if (!response.ok) throw new Error('Network response was not ok');
+
+        const contentLength = response.headers.get('content-length');
+        const total = contentLength ? parseInt(contentLength, 10) : null;
+        let loaded = 0;
+        const reader = response.body.getReader();
+        const chunks = [];
+
+        while(true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          chunks.push(value);
+          loaded += value.length;
+          if (total) {
+            const percent = Math.round((loaded / total) * 100);
+            progressBar.value = percent;
+            progressText.textContent = percent + '%';
+          } else {
+            progressText.textContent = `Downloaded ${loaded} bytes`;
+          }
+        }
+
+        downloadedBlob = new Blob(chunks);
+        spinnerModal.style.display = 'none';
+        saveFileBtn.style.display = 'inline-block';
+        progressText.textContent = 'Download complete! Click "Save File" to save.';
+      } catch (e) {
+        if (e.name === 'AbortError') {
+          progressText.textContent = 'Download cancelled.';
+        } else {
+          progressText.textContent = 'Download failed: ' + e.message;
+        }
+        spinnerModal.style.display = 'none';
+        saveFileBtn.style.display = 'none';
+      }
+    }
+
+    saveFileBtn.addEventListener('click', () => {
+      if (!downloadedBlob) return;
+
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(downloadedBlob);
+      a.download = (title || 'video') + '.' + (url.split('.').pop().split(/\#|\?/)[0] || 'mp4');
+      a.style.display = 'none';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+
+      closeDownloadModal();
+    });
+
+    cancelDownloadBtn.addEventListener('click', () => {
+      if (downloadController) downloadController.abort();
+      closeDownloadModal();
+    });
+
+    function closeDownloadModal() {
+      downloadModal.style.display = 'none';
+      downloadedBlob = null;
+      progressBar.value = 0;
+      progressText.textContent = '0%';
+    }
+
+    // Abort download if user closes tab or reloads page
+    window.addEventListener('beforeunload', () => {
+      if (downloadController) downloadController.abort();
+    });
+
+    // Video setup and playback logic
+
+    function showVideo(v) {
+      hideSpinner();
+      v.style.display = 'block';
+      seekControls.style.display = 'flex';
+      v.focus();
+      v.play().catch(() => {});
+      setupDownload();
+    }
+
     if (url.match(/\.m3u8$/i)) {
-      const video = document.createElement('video');
+      video = document.createElement('video');
       video.controls = true;
       video.autoplay = true;
       video.style.display = 'none';
+      video.setAttribute('playsinline', '');
       container.appendChild(video);
 
       if (Hls.isSupported()) {
@@ -166,9 +463,7 @@
         hls.loadSource(url);
         hls.attachMedia(video);
         hls.on(Hls.Events.MANIFEST_PARSED, () => {
-          hideSpinner();
-          video.style.display = 'block';
-          video.play();
+          showVideo(video);
         });
         hls.on(Hls.Events.ERROR, () => {
           hideSpinner();
@@ -176,8 +471,7 @@
       } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
         video.src = url;
         video.addEventListener('loadedmetadata', () => {
-          hideSpinner();
-          video.style.display = 'block';
+          showVideo(video);
         });
       } else {
         container.innerHTML = "<p>Your browser does not support HLS playback.</p>";
@@ -185,15 +479,15 @@
       }
 
     } else if (url.match(/\.(mp4|webm|ogg)$/i)) {
-      const video = document.createElement('video');
+      video = document.createElement('video');
       video.src = url;
       video.controls = true;
       video.autoplay = true;
       video.style.display = 'none';
+      video.setAttribute('playsinline', '');
       container.appendChild(video);
       video.addEventListener('loadeddata', () => {
-        hideSpinner();
-        video.style.display = 'block';
+        showVideo(video);
       });
 
     } else {
@@ -202,7 +496,11 @@
       iframe.allowFullscreen = true;
       iframe.onload = hideSpinner;
       container.appendChild(iframe);
+      seekControls.style.display = 'none';
     }
+
+    setupSeekControls();
+    setupFullscreen();
   </script>
 </body>
 </html>
