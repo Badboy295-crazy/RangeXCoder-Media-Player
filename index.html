@@ -24,7 +24,7 @@
     .theme-toggle {
       position: fixed;
       top: 15px;
-      right: 65px; /* Shift right to accommodate download button */
+      right: 65px; /* shifted for download button */
       background-color: #4f46e5;
       color: white;
       border: none;
@@ -88,7 +88,7 @@
       border-radius: 6px;
     }
 
-    /* Customized Spinner */
+    /* Loading Spinner */
     #loadingSpinner {
       position: absolute;
       z-index: 10;
@@ -98,7 +98,6 @@
       user-select: none;
       text-align: center;
     }
-    /* Dots Loader */
     .dots-loader {
       display: inline-block;
       width: 60px;
@@ -109,34 +108,24 @@
       width: 12px;
       height: 12px;
       margin: 0 5px;
-      background-color: #6366f1; /* Indigo-500 */
+      background-color: #6366f1;
       border-radius: 50%;
       animation-name: dotsBounce;
       animation-duration: 1.4s;
       animation-iteration-count: infinite;
       animation-timing-function: ease-in-out;
     }
-    .dots-loader > div:nth-child(1) {
-      animation-delay: -0.32s;
-    }
-    .dots-loader > div:nth-child(2) {
-      animation-delay: -0.16s;
-    }
+    .dots-loader > div:nth-child(1) { animation-delay: -0.32s; }
+    .dots-loader > div:nth-child(2) { animation-delay: -0.16s; }
     @keyframes dotsBounce {
-      0%, 80%, 100% {
-        transform: scale(0);
-        opacity: 0.3;
-      }
-      40% {
-        transform: scale(1);
-        opacity: 1;
-      }
+      0%, 80%, 100% { transform: scale(0); opacity: 0.3; }
+      40% { transform: scale(1); opacity: 1; }
     }
 
-    /* Styled Video Title */
+    /* Video Title */
     #videoTitle {
       font-weight: 700;
-      color: #4f46e5; /* Indigo-600 */
+      color: #4f46e5;
       text-align: center;
       margin-bottom: 1.5rem;
       cursor: default;
@@ -165,11 +154,11 @@
       background-color: #9f1239;
     }
 
-    /* Speed selector style */
+    /* SPEED SELECTOR - TOP RIGHT INSIDE VIDEO CONTAINER */
     .speed-selector-wrapper {
       position: absolute;
       top: 10px;
-      right: 130px; /* Shifted right for toggle buttons */
+      right: 10px; /* inside video container */
       background: #4f46e5;
       padding: 5px 10px;
       border-radius: 8px;
@@ -284,7 +273,7 @@
   <div id="downloadModal" role="dialog" aria-modal="true" aria-labelledby="downloadModalTitle" aria-describedby="downloadModalDesc">
     <div class="modal-content">
       <h3 id="downloadModalTitle">Download Video</h3>
-      <p id="downloadModalDesc">Do you want to download this video using 1DM app?</p>
+      <p id="downloadModalDesc">Do you want to download this video?</p>
       <div class="modal-buttons">
         <button class="start-download" onclick="triggerDownload()">Start Download</button>
         <button class="cancel-download" onclick="closeDownloadModal()">Cancel</button>
@@ -305,7 +294,7 @@
   const spinner = document.getElementById('loadingSpinner');
   const videoTitle = document.getElementById('videoTitle');
   videoTitle.innerText = title;
-  videoTitle.title = title; // Tooltip with full title
+  videoTitle.title = title;
 
   let video;
   let lastTap = 0;
@@ -339,7 +328,7 @@
     return parseFloat(localStorage.getItem(getStorageKey(url))) || 0;
   }
 
-  // Double tap to seek 10s left or right on mobile
+  // Mobile double tap: 10s seek left/right
   function addMobileTapControls(el) {
     el.addEventListener('touchend', e => {
       const now = Date.now();
@@ -354,7 +343,7 @@
     });
   }
 
-  // Create speed selector dropdown
+  // Create speed selector dropdown inside video container (top-right)
   function addSpeedSelector() {
     const speedWrapper = document.createElement('div');
     speedWrapper.className = 'speed-selector-wrapper';
@@ -385,7 +374,7 @@
     return select;
   }
 
-  // Keyboard shortcuts and space key hold speed boost
+  // Keyboard shortcuts and space hold for speed boost
   function addKeyboardControls(speedSelect) {
     window.addEventListener('keydown', e => {
       if (!video) return;
@@ -394,7 +383,7 @@
         case 'Space':
           e.preventDefault();
           if (!speedHeld) {
-            video.playbackRate = 3.0; // Hold space to speed 3x
+            video.playbackRate = 3.0;
             speedHeld = true;
           }
           break;
@@ -475,7 +464,7 @@
     addKeyboardControls(speedSelect);
   }
 
-  // --- Download Modal Logic ---
+  // Download Modal logic - simple direct download (new tab)
   const downloadModal = document.getElementById("downloadModal");
 
   function openDownloadModal() {
@@ -489,17 +478,16 @@
   function triggerDownload() {
     closeDownloadModal();
     if (!url) {
-      alert("No video URL found.");
+      alert("Video URL nahi mila.");
       return;
     }
-    const cleanURL = decodeURIComponent(url);
-    const intentURL = `intent://${cleanURL.replace(/^https?:\/\//, '')}#Intent;package=idm.internet.download.manager;scheme=https;end;`;
-    window.location.href = intentURL;
+    window.open(decodeURIComponent(url), '_blank');
   }
 
-  // Main player logic for URL handling and setup
+  // Main player logic
   if (!url) {
     container.innerHTML = "<p class='text-danger text-center'>?? No video URL provided!</p>";
+    hideSpinner();
   } else if (url.match(/\.m3u8$/i)) {
     video = document.createElement('video');
     video.controls = true;
@@ -536,7 +524,6 @@
       localStorage.removeItem(getStorageKey(url));
     });
 
-    // Speed selector + keyboard controls for HLS
     const speedSelect = addSpeedSelector();
     addKeyboardControls(speedSelect);
 
