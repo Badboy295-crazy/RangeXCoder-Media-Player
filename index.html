@@ -464,7 +464,7 @@
     addKeyboardControls(speedSelect);
   }
 
-  // Download Modal logic - simple direct download (new tab)
+  // Download Modal logic - 1DM app intent URL support ke saath
   const downloadModal = document.getElementById("downloadModal");
 
   function openDownloadModal() {
@@ -481,7 +481,17 @@
       alert("Video URL nahi mila.");
       return;
     }
-    window.open(decodeURIComponent(url), '_blank');
+    const videoUrlDecoded = decodeURIComponent(url);
+    const isAndroid = /Android/i.test(navigator.userAgent);
+
+    if (isAndroid) {
+      // 1DM Android intent URL banaya gaya
+      const intentUrl = `intent://${videoUrlDecoded.replace(/^https?:\/\//, '')}#Intent;scheme=https;package=idm.internet.download.manager;end`;
+      window.location.href = intentUrl;
+    } else {
+      // Android ke alawa normal open new tab
+      window.open(videoUrlDecoded, '_blank');
+    }
   }
 
   // Main player logic
