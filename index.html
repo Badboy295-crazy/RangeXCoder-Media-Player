@@ -2,49 +2,289 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Video Player</title>
-  <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>RangeXCoder - Video Player</title>
+
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link href="https://cdn.jsdelivr.net/npm/remixicon@4.0.0/fonts/remixicon.css" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+
   <style>
-    /* ... aapka pura existing CSS yahi rahega, no changes */
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background-color: #f8fafc;
+      color: #0f172a;
+      padding: 2rem;
+      transition: background-color 0.3s, color 0.3s;
+    }
+    body.dark-mode {
+      background-color: #0f172a;
+      color: #f1f5f9;
+    }
+    .theme-toggle {
+      position: fixed;
+      top: 15px;
+      right: 65px; /* Shift right to accommodate download button */
+      background-color: #4f46e5;
+      color: white;
+      border: none;
+      border-radius: 50%;
+      width: 45px;
+      height: 45px;
+      font-size: 20px;
+      cursor: pointer;
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background-color 0.3s;
+    }
+    .theme-toggle:hover {
+      background-color: #3730a3;
+    }
+    .download-button {
+      position: fixed;
+      top: 15px;
+      right: 15px;
+      background-color: #22c55e; /* green */
+      color: white;
+      border: none;
+      border-radius: 50%;
+      width: 45px;
+      height: 45px;
+      font-size: 20px;
+      cursor: pointer;
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background-color 0.3s;
+    }
+    .download-button:hover {
+      background-color: #15803d;
+    }
+    .video-container {
+      max-width: 900px;
+      margin: auto;
+      border: 4px solid #4f46e5;
+      border-radius: 10px;
+      overflow: hidden;
+      background-color: white;
+      box-shadow: 0 0 15px rgba(0,0,0,0.2);
+      aspect-ratio: 16/9;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    body.dark-mode .video-container {
+      background-color: #1e293b;
+      border-color: #818cf8;
+    }
+    video, iframe {
+      width: 100%;
+      height: 100%;
+      display: block;
+      border-radius: 6px;
+    }
+
+    /* Customized Spinner */
+    #loadingSpinner {
+      position: absolute;
+      z-index: 10;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      user-select: none;
+      text-align: center;
+    }
+    /* Dots Loader */
+    .dots-loader {
+      display: inline-block;
+      width: 60px;
+      height: 20px;
+    }
+    .dots-loader > div {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      margin: 0 5px;
+      background-color: #6366f1; /* Indigo-500 */
+      border-radius: 50%;
+      animation-name: dotsBounce;
+      animation-duration: 1.4s;
+      animation-iteration-count: infinite;
+      animation-timing-function: ease-in-out;
+    }
+    .dots-loader > div:nth-child(1) {
+      animation-delay: -0.32s;
+    }
+    .dots-loader > div:nth-child(2) {
+      animation-delay: -0.16s;
+    }
+    @keyframes dotsBounce {
+      0%, 80%, 100% {
+        transform: scale(0);
+        opacity: 0.3;
+      }
+      40% {
+        transform: scale(1);
+        opacity: 1;
+      }
+    }
+
+    /* Styled Video Title */
+    #videoTitle {
+      font-weight: 700;
+      color: #4f46e5; /* Indigo-600 */
+      text-align: center;
+      margin-bottom: 1.5rem;
+      cursor: default;
+      user-select: none;
+      max-width: 90vw;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .back-button {
+      margin: 2rem auto 0;
+      display: block;
+      background-color: #e11d48;
+      color: white;
+      border: none;
+      padding: 0.6rem 1.2rem;
+      border-radius: 6px;
+      font-weight: 500;
+      cursor: pointer;
+      max-width: 220px;
+      text-align: center;
+      transition: background-color 0.3s;
+    }
+    .back-button:hover {
+      background-color: #9f1239;
+    }
+
+    /* Speed selector style */
+    .speed-selector-wrapper {
+      position: absolute;
+      top: 10px;
+      right: 130px; /* Shifted right for toggle buttons */
+      background: #4f46e5;
+      padding: 5px 10px;
+      border-radius: 8px;
+      z-index: 20;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: white;
+      font-weight: 600;
+      font-size: 14px;
+    }
+    .speed-selector-wrapper select {
+      border: none;
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    /* Download Modal Styles */
+    #downloadModal {
+      display: none;
+      position: fixed;
+      z-index: 1050;
+      left: 0;
+      top: 0;
+      width: 100vw;
+      height: 100vh;
+      background-color: rgba(0,0,0,0.6);
+      align-items: center;
+      justify-content: center;
+    }
+    #downloadModal .modal-content {
+      background: white;
+      border-radius: 8px;
+      padding: 1.5rem 2rem;
+      max-width: 320px;
+      text-align: center;
+      box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+    }
+    #downloadModal .modal-content h3 {
+      margin-bottom: 1rem;
+      color: #4f46e5;
+    }
+    #downloadModal .modal-content p {
+      margin-bottom: 1.5rem;
+      font-size: 1rem;
+      color: #333;
+    }
+    #downloadModal .modal-buttons {
+      display: flex;
+      justify-content: center;
+      gap: 1rem;
+    }
+    #downloadModal button.start-download {
+      background-color: #22c55e;
+      color: white;
+      border: none;
+      padding: 0.5rem 1.2rem;
+      border-radius: 6px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background-color 0.3s;
+    }
+    #downloadModal button.start-download:hover {
+      background-color: #15803d;
+    }
+    #downloadModal button.cancel-download {
+      background-color: #ef4444;
+      color: white;
+      border: none;
+      padding: 0.5rem 1.2rem;
+      border-radius: 6px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background-color 0.3s;
+    }
+    #downloadModal button.cancel-download:hover {
+      background-color: #b91c1c;
+    }
   </style>
 </head>
 <body>
 
-  <button class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle Theme">
+  <!-- Dark Mode Toggle Button -->
+  <button class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle Dark Mode" title="Toggle Dark Mode">
     <i class="ri-moon-clear-line"></i>
   </button>
 
+  <!-- Download Button -->
   <button class="download-button" onclick="openDownloadModal()" aria-label="Download Video" title="Download Video">
     <i class="ri-download-line"></i>
   </button>
 
-  <!-- Title jo URL se ayega -->
-  <h2 id="videoTitle">Video Player</h2>
+  <!-- Video Title with tooltip -->
+  <h2 id="videoTitle" title="Loading...">Loading...</h2>
 
-  <div class="controls">
-    <label for="speed">Playback Speed:</label>
-    <select id="speed" onchange="setPlaybackSpeed(this.value)">
-      <option value="0.5">0.5x</option>
-      <option value="1" selected>1x (Normal)</option>
-      <option value="1.5">1.5x</option>
-      <option value="2">2x</option>
-    </select>
+  <div class="video-container" id="playerContainer">
+    <div id="loadingSpinner" aria-label="Loading video">
+      <div class="dots-loader" aria-hidden="true">
+        <div></div><div></div><div></div>
+      </div>
+      <p style="margin-top: 0.5rem; color: #4f46e5; font-weight: 600;">Loading video...</p>
+    </div>
   </div>
 
-  <video id="videoPlayer" controls controlsList="nodownload">
-    <source id="videoSource" src="https://dga9kme080o0w.cloudfront.net/out/v1/5c7cfedca3df4fc99ea383b5f2e6a7a8/index_3.m3u8" type="application/x-mpegURL" />
-    Your browser does not support HTML5 video.
-  </video>
+  <button class="back-button" onclick="goBack()" title="Back to Lectures" aria-label="Back to Lectures">
+    ? Back to Lectures
+  </button>
 
-  <br />
-  <a href="lectures.html" class="back-link">? Back to Lectures</a>
-
-  <!-- Modal -->
-  <div id="downloadModal">
+  <!-- Download Modal -->
+  <div id="downloadModal" role="dialog" aria-modal="true" aria-labelledby="downloadModalTitle" aria-describedby="downloadModalDesc">
     <div class="modal-content">
-      <h3>Download Video</h3>
-      <p>Do you want to download this video using 1DM app?</p>
+      <h3 id="downloadModalTitle">Download Video</h3>
+      <p id="downloadModalDesc">Do you want to download this video using 1DM app?</p>
       <div class="modal-buttons">
         <button class="start-download" onclick="triggerDownload()">Start Download</button>
         <button class="cancel-download" onclick="closeDownloadModal()">Cancel</button>
@@ -52,104 +292,265 @@
     </div>
   </div>
 
-  <script>
-    // ** New code to get URL parameters **
-    function getURLParams() {
-      const params = new URLSearchParams(window.location.search);
-      return {
-        title: params.get('title') || "Video Player",
-        url: params.get('url') || ''
-      };
+<script>
+  // Get URL parameters
+  const params = new URLSearchParams(window.location.search);
+  const title = params.get('title') || 'Video';
+  let url = params.get('url') || '';
+  if (!url && params.get('video')) {
+    try { url = atob(params.get('video')); } catch {}
+  }
+
+  const container = document.getElementById('playerContainer');
+  const spinner = document.getElementById('loadingSpinner');
+  const videoTitle = document.getElementById('videoTitle');
+  videoTitle.innerText = title;
+  videoTitle.title = title; // Tooltip with full title
+
+  let video;
+  let lastTap = 0;
+  let speedHeld = false;
+
+  function toggleTheme() {
+    document.body.classList.toggle('dark-mode');
+  }
+
+  function hideSpinner() {
+    spinner.style.display = 'none';
+  }
+
+  function goBack() {
+    window.history.back();
+  }
+
+  function getStorageKey(url) {
+    return "rangexcoder_playback_" + btoa(url).substring(0, 30);
+  }
+
+  function savePlaybackTime(url, time) {
+    try {
+      localStorage.setItem(getStorageKey(url), time);
+    } catch (e) {
+      console.warn("Cannot store playback time", e);
     }
+  }
 
-    // Set title and video source from URL params
-    function loadVideoFromParams() {
-      const {title, url} = getURLParams();
+  function loadPlaybackTime(url) {
+    return parseFloat(localStorage.getItem(getStorageKey(url))) || 0;
+  }
 
-      // Set video title
-      document.getElementById('videoTitle').innerText = decodeURIComponent(title);
-
-      // Set video source if url present
-      if(url) {
-        const videoSource = document.getElementById('videoSource');
-        const videoPlayer = document.getElementById('videoPlayer');
-        videoSource.src = url;
-        videoPlayer.load();
+  // Double tap to seek 10s left or right on mobile
+  function addMobileTapControls(el) {
+    el.addEventListener('touchend', e => {
+      const now = Date.now();
+      const dt = now - lastTap;
+      lastTap = now;
+      if (dt < 300) {
+        const x = e.changedTouches[0].clientX;
+        const w = window.innerWidth;
+        if (x < w / 2) video.currentTime = Math.max(0, video.currentTime - 10);
+        else video.currentTime = Math.min(video.duration, video.currentTime + 10);
       }
-    }
+    });
+  }
 
-    // Call this on page load
-    loadVideoFromParams();
+  // Create speed selector dropdown
+  function addSpeedSelector() {
+    const speedWrapper = document.createElement('div');
+    speedWrapper.className = 'speed-selector-wrapper';
 
-    const video = document.getElementById("videoPlayer");
-    // We'll get the updated source URL dynamically:
-    let videoURL = document.getElementById("videoSource").src;
-    let STORAGE_KEY = "video_time_" + videoURL;
+    const label = document.createElement('label');
+    label.textContent = 'Speed:';
 
-    // When URL changes (loadVideoFromParams), update STORAGE_KEY accordingly:
-    function updateStorageKey() {
-      videoURL = document.getElementById("videoSource").src;
-      STORAGE_KEY = "video_time_" + videoURL;
-    }
-    updateStorageKey();
+    const select = document.createElement('select');
+    const speeds = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 2.5, 3, 4, 5];
+    speeds.forEach(spd => {
+      const option = document.createElement('option');
+      option.value = spd;
+      option.textContent = spd + 'x';
+      if (spd === 1) option.selected = true;
+      select.appendChild(option);
+    });
 
-    // Resume video
-    video.addEventListener("loadedmetadata", () => {
-      updateStorageKey();
-      const savedTime = localStorage.getItem(STORAGE_KEY);
-      if (savedTime) {
-        video.currentTime = parseFloat(savedTime);
+    select.addEventListener('change', () => {
+      if (video && !speedHeld) {
+        video.playbackRate = parseFloat(select.value);
       }
     });
 
-    // Save current time every 5s
-    setInterval(() => {
-      if (!video.paused) {
-        localStorage.setItem(STORAGE_KEY, video.currentTime);
+    speedWrapper.appendChild(label);
+    speedWrapper.appendChild(select);
+    container.appendChild(speedWrapper);
+
+    return select;
+  }
+
+  // Keyboard shortcuts and space key hold speed boost
+  function addKeyboardControls(speedSelect) {
+    window.addEventListener('keydown', e => {
+      if (!video) return;
+
+      switch(e.code) {
+        case 'Space':
+          e.preventDefault();
+          if (!speedHeld) {
+            video.playbackRate = 3.0; // Hold space to speed 3x
+            speedHeld = true;
+          }
+          break;
       }
-    }, 5000);
 
-    // Dark mode toggle
-    function toggleTheme() {
-      document.body.classList.toggle("dark");
-    }
-
-    // Playback speed change
-    function setPlaybackSpeed(rate) {
-      video.playbackRate = parseFloat(rate);
-    }
-
-    // Keyboard navigation
-    document.addEventListener("keydown", (e) => {
-      if (e.key === "ArrowRight") {
-        video.currentTime += 10;
-      } else if (e.key === "ArrowLeft") {
-        video.currentTime -= 10;
+      switch(e.key) {
+        case ' ':
+          e.preventDefault();
+          if (video.paused) video.play();
+          else video.pause();
+          break;
+        case 'ArrowLeft':
+          video.currentTime = Math.max(0, video.currentTime - 10);
+          break;
+        case 'ArrowRight':
+          video.currentTime = Math.min(video.duration, video.currentTime + 10);
+          break;
+        case 'ArrowUp':
+          e.preventDefault();
+          video.volume = Math.min(1, video.volume + 0.1);
+          break;
+        case 'ArrowDown':
+          e.preventDefault();
+          video.volume = Math.max(0, video.volume - 0.1);
+          break;
+        case 'r':
+        case 'R':
+          video.currentTime = 0;
+          break;
+        case 'f':
+        case 'F':
+          if (video.requestFullscreen) video.requestFullscreen();
+          else if (video.webkitRequestFullscreen) video.webkitRequestFullscreen();
+          else if (video.msRequestFullscreen) video.msRequestFullscreen();
+          break;
       }
     });
 
-    // Open download modal
-    function openDownloadModal() {
-      document.getElementById("downloadModal").style.display = "flex";
-    }
-
-    // Close download modal
-    function closeDownloadModal() {
-      document.getElementById("downloadModal").style.display = "none";
-    }
-
-    // Trigger 1DM download
-    function triggerDownload() {
-      closeDownloadModal();
-      if (!videoURL) {
-        alert("No video URL found.");
-        return;
+    window.addEventListener('keyup', e => {
+      if (e.code === 'Space' && speedHeld) {
+        video.playbackRate = parseFloat(speedSelect.value) || 1.0;
+        speedHeld = false;
       }
-      const cleanURL = decodeURIComponent(videoURL);
-      const intentURL = `intent://${cleanURL.replace(/^https?:\/\//, '')}#Intent;package=idm.internet.download.manager;scheme=https;end`;
-      window.location.href = intentURL;
+    });
+  }
+
+  // Initialize video element with resume playback
+  function initVideo(src) {
+    video = document.createElement('video');
+    video.src = src;
+    video.controls = true;
+    video.autoplay = true;
+    video.setAttribute('playsinline', '');
+    video.style.borderRadius = '6px';
+
+    video.addEventListener('loadedmetadata', () => {
+      const savedTime = loadPlaybackTime(src);
+      if (savedTime > 5 && savedTime < video.duration - 5) {
+        video.currentTime = savedTime;
+      }
+    });
+
+    video.addEventListener('timeupdate', () => {
+      if (!video.seeking && !video.paused) {
+        savePlaybackTime(src, video.currentTime);
+      }
+    });
+
+    video.addEventListener('ended', () => {
+      localStorage.removeItem(getStorageKey(src));
+    });
+
+    video.addEventListener('loadeddata', hideSpinner);
+    container.appendChild(video);
+    addMobileTapControls(video);
+
+    const speedSelect = addSpeedSelector();
+    addKeyboardControls(speedSelect);
+  }
+
+  // --- Download Modal Logic ---
+  const downloadModal = document.getElementById("downloadModal");
+
+  function openDownloadModal() {
+    downloadModal.style.display = "flex";
+  }
+
+  function closeDownloadModal() {
+    downloadModal.style.display = "none";
+  }
+
+  function triggerDownload() {
+    closeDownloadModal();
+    if (!url) {
+      alert("No video URL found.");
+      return;
     }
-  </script>
+    const cleanURL = decodeURIComponent(url);
+    const intentURL = `intent://${cleanURL.replace(/^https?:\/\//, '')}#Intent;package=idm.internet.download.manager;scheme=https;end;`;
+    window.location.href = intentURL;
+  }
+
+  // Main player logic for URL handling and setup
+  if (!url) {
+    container.innerHTML = "<p class='text-danger text-center'>?? No video URL provided!</p>";
+  } else if (url.match(/\.m3u8$/i)) {
+    video = document.createElement('video');
+    video.controls = true;
+    video.autoplay = true;
+    video.setAttribute('playsinline', '');
+    container.appendChild(video);
+    addMobileTapControls(video);
+
+    if (Hls.isSupported()) {
+      const hls = new Hls();
+      hls.loadSource(url);
+      hls.attachMedia(video);
+      hls.on(Hls.Events.MANIFEST_PARSED, hideSpinner);
+      hls.on(Hls.Events.LEVEL_LOADED, () => {
+        const savedTime = loadPlaybackTime(url);
+        if (savedTime > 5) video.currentTime = savedTime;
+      });
+    } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+      video.src = url;
+      video.addEventListener('loadedmetadata', () => {
+        const savedTime = loadPlaybackTime(url);
+        if (savedTime > 5) video.currentTime = savedTime;
+        hideSpinner();
+      });
+    } else {
+      container.innerHTML = "<p>Your browser does not support HLS playback.</p>";
+      hideSpinner();
+    }
+
+    video.addEventListener('timeupdate', () => {
+      savePlaybackTime(url, video.currentTime);
+    });
+    video.addEventListener('ended', () => {
+      localStorage.removeItem(getStorageKey(url));
+    });
+
+    // Speed selector + keyboard controls for HLS
+    const speedSelect = addSpeedSelector();
+    addKeyboardControls(speedSelect);
+
+  } else if (url.match(/\.(mp4|webm|ogg)$/i)) {
+    initVideo(url);
+  } else {
+    const iframe = document.createElement('iframe');
+    iframe.src = url;
+    iframe.allowFullscreen = true;
+    iframe.style.borderRadius = '6px';
+    iframe.onload = hideSpinner;
+    container.appendChild(iframe);
+  }
+</script>
 
 </body>
 </html>
