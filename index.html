@@ -153,28 +153,52 @@ function openDownloadModal(){ downloadModal.style.display="flex"; }
 function closeDownloadModal(){ downloadModal.style.display="none"; }
 function triggerDownload(){ closeDownloadModal(); if(!url){ alert("Video URL nahi mila."); return; } window.open(decodeURIComponent(url),'_blank'); }
 
-// ----------- Gamified Points System -----------
-let watchSeconds=0, points=0, countdown=60, countdownInterval;
+// ----------- Gamified Points System per second -----------
+let points = 0;                // User's points
+let lastUpdate = Date.now();   // Last timestamp
+
 const pointsValue = document.getElementById("pointsValue");
-const pointsCountdown = document.getElementById("pointsCountdown");
 
-function loadPoints(){
-  points = parseInt(localStorage.getItem("video_points")||"0");
-  pointsValue.textContent = points;
-}
-function savePoints(){ localStorage.setItem("video_points",points); }
-
-function startPointsTimer(){
-  countdown = 60; pointsCountdown.textContent = countdown + 's';
-  countdownInterval = setInterval(()=>{
-    if(video.paused) return;
-    countdown--;
-    if(countdown<=0){
-      points+=2; savePoints(); pointsValue.textContent=points; countdown=60;
+// Load user points from localStorage (per user if logged in)
+function loadPoints() {
+    const user = getLoggedInUser(); // From login system
+    if(user){
+        points = parseInt(localStorage.getItem("points_" + user.email) || "0");
+    } else {
+        points = parseInt(localStorage.getItem("video_points") || "0");
     }
-    pointsCountdown.textContent = countdown + 's';
-  },1000);
+    pointsValue.textContent = points;
 }
+
+// Save points to localStorage
+function savePoints() {
+    const user = getLoggedInUser();
+    if(user){
+        localStorage.setItem("points_" + user.email, points);
+    } else {
+        localStorage.setItem("video_points", points);
+    }
+    pointsValue.textContent = points;
+}
+
+// Start adding points for every second watched
+function startPointsTimer() {
+    lastUpdate = Date.now();
+    function tick() {
+        if(video && !video.paused){
+            const now = Date.now();
+            const elapsed = (now - lastUpdate) / 1000; // seconds
+            if(elapsed >= 1){
+                points += 2 * Math.floor(elapsed); // 2 points per second
+                savePoints();
+                lastUpdate = now;
+            }
+        }
+        requestAnimationFrame(tick);
+    }
+    tick();
+}
+
 
 // ----------- Init Video -----------
 function initVideo(src){
