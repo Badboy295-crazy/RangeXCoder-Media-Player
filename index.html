@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
   <title>RangeXCoder - Professional Video Player</title>
 
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
@@ -229,6 +229,8 @@
       padding: 0.5rem 1rem;
       height: 70px;
       background: linear-gradient(to top, rgba(0,0,0,0.7), transparent);
+      opacity: 1 !important; /* Normal mode ??? ????? visible */
+      pointer-events: auto !important;
     }
 
     .video-wrapper:not(.fullscreen) .right-controls {
@@ -354,25 +356,15 @@
       height: 16px;
     }
 
-    /* Fullscreen ??? Video Play ???? ?? Controls Hide */
-    .video-wrapper.fullscreen.hide-controls .video-controls:not(.force-show) {
-      opacity: 0;
-    }
-
-    .video-wrapper.fullscreen:hover .video-controls {
-      opacity: 1;
-    }
-
-    /* Force show controls */
-    .video-controls.force-show {
-      opacity: 1 !important;
-      pointer-events: all !important;
-    }
-
-    /* Hide controls completely */
-    .video-controls.hidden {
+    /* Hide controls in fullscreen */
+    .video-wrapper.fullscreen .video-controls.hidden {
       opacity: 0 !important;
       pointer-events: none !important;
+    }
+
+    .video-wrapper.fullscreen .video-controls:not(.hidden) {
+      opacity: 1 !important;
+      pointer-events: all !important;
     }
 
     /* Progress Bar */
@@ -839,8 +831,8 @@
       background-color: var(--danger-dark);
     }
 
-    /* Mobile responsiveness */
-    @media (max-width: 768px) {
+    /* Mobile Landscape Mode */
+    @media screen and (max-width: 768px) {
       body {
         padding: 0.5rem;
       }
@@ -880,6 +872,45 @@
       .volume-slider {
         width: 60px;
       }
+      
+      /* Mobile fullscreen landscape mode */
+      @media (orientation: landscape) {
+        .video-wrapper.fullscreen {
+          height: 100vh !important;
+          width: 100vw !important;
+          min-height: 100vh !important;
+          border-radius: 0 !important;
+          margin: 0 !important;
+          padding: 0 !important;
+        }
+        
+        .video-wrapper.fullscreen video {
+          object-fit: contain !important;
+          height: 100vh !important;
+          width: 100vw !important;
+        }
+        
+        .video-wrapper.fullscreen .video-controls {
+          padding: 0.8rem !important;
+        }
+        
+        .video-wrapper.fullscreen .control-btn {
+          font-size: 1rem !important;
+        }
+        
+        .video-wrapper.fullscreen .time-display {
+          font-size: 0.8rem !important;
+          min-width: 100px !important;
+        }
+        
+        .video-wrapper.fullscreen .pip-btn,
+        .video-wrapper.fullscreen .audio-boost-btn,
+        .video-wrapper.fullscreen .playback-speed-btn,
+        .video-wrapper.fullscreen .quality-btn {
+          padding: 0.2rem 0.4rem !important;
+          font-size: 0.7rem !important;
+        }
+      }
     }
     
     @media (max-width: 480px) {
@@ -916,6 +947,28 @@
         bottom: 50px;
         left: 0.5rem;
         right: 0.5rem;
+      }
+      
+      /* Mobile landscape mode for small screens */
+      @media (orientation: landscape) {
+        .video-wrapper.fullscreen {
+          height: 100vh !important;
+          min-height: 100vh !important;
+        }
+        
+        .video-wrapper.fullscreen video {
+          height: 100vh !important;
+        }
+        
+        body {
+          padding: 0 !important;
+          margin: 0 !important;
+        }
+        
+        .player-container {
+          width: 100vw !important;
+          height: 100vh !important;
+        }
       }
     }
   </style>
@@ -1171,12 +1224,12 @@
   let hls;
   let controlsHideTimeout;
   let isFullscreen = false;
-  let isControlsVisible = true;
+  let areControlsVisible = true;
   const CONTROLS_HIDE_DELAY = 3000;
   let audioBoostLevel = 1.0;
   const MAX_AUDIO_BOOST = 3.0;
   let isPipActive = false;
-  let isClickToggleEnabled = true;
+  let isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
   function formatTime(seconds) {
     const hrs = Math.floor(seconds / 3600);
@@ -1306,15 +1359,99 @@
     }
   }
 
-  function toggleControlsOnClick() {
-    if (!isClickToggleEnabled || !video) return;
+  // ========== NEW: MOBILE LANDSCAPE ROTATION ==========
+  function lockToLandscape() {
+    if (!isMobile || !isFullscreen) return;
     
-    if (!isFullscreen) {
-      showControls();
-      return;
+    try {
+      // Try to lock orientation to landscape
+      if (screen.orientation && screen.orientation.lock) {
+        screen.orientation.lock('landscape').then(() => {
+          console.log('Screen locked to landscape');
+        }).catch(error => {
+          console.log('Failed to lock orientation:', error);
+          // Fallback: Use CSS transform for older browsers
+          applyLandscapeFallback();
+        });
+      } else if (screen.lockOrientation) {
+        // Legacy API
+        screen.lockOrientation('landscape');
+      } else if (screen.mozLockOrientation) {
+        screen.mozLockOrientation('landscape');
+      } else if (screen.msLockOrientation) {
+        screen.msLockOrientation('landscape');
+      } else {
+        // Fallback for browsers that don't support orientation lock
+        applyLandscapeFallback();
+      }
+    } catch (error) {
+      console.error('Error locking orientation:', error);
+      applyLandscapeFallback();
     }
+  }
+
+  function unlockOrientation() {
+    if (!isMobile) return;
     
-    if (isControlsVisible) {
+    try {
+      if (screen.orientation && screen.orientation.unlock) {
+        screen.orientation.unlock();
+      } else if (screen.unlockOrientation) {
+        screen.unlockOrientation();
+      } else if (screen.mozUnlockOrientation) {
+        screen.mozUnlockOrientation();
+      } else if (screen.msUnlockOrientation) {
+        screen.msUnlockOrientation();
+      }
+    } catch (error) {
+      console.error('Error unlocking orientation:', error);
+    }
+  }
+
+  function applyLandscapeFallback() {
+    // CSS fallback for landscape mode
+    if (isFullscreen && isMobile) {
+      document.body.style.transform = 'rotate(90deg)';
+      document.body.style.transformOrigin = 'center center';
+      document.body.style.width = '100vh';
+      document.body.style.height = '100vw';
+      document.body.style.position = 'fixed';
+      document.body.style.top = '50%';
+      document.body.style.left = '50%';
+      document.body.style.marginTop = '-50vw';
+      document.body.style.marginLeft = '-50vh';
+      
+      // Adjust video container
+      container.style.transform = 'rotate(-90deg)';
+      container.style.transformOrigin = 'center center';
+      container.style.width = '100vh';
+      container.style.height = '100vw';
+    }
+  }
+
+  function removeLandscapeFallback() {
+    // Remove CSS fallback transformations
+    document.body.style.transform = '';
+    document.body.style.transformOrigin = '';
+    document.body.style.width = '';
+    document.body.style.height = '';
+    document.body.style.position = '';
+    document.body.style.top = '';
+    document.body.style.left = '';
+    document.body.style.marginTop = '';
+    document.body.style.marginLeft = '';
+    
+    container.style.transform = '';
+    container.style.transformOrigin = '';
+    container.style.width = '';
+    container.style.height = '';
+  }
+
+  // ========== MAIN CLICK TO TOGGLE FUNCTION ==========
+  function toggleControlsVisibility() {
+    if (!isFullscreen || !video) return;
+    
+    if (areControlsVisible) {
       hideControls();
     } else {
       showControls();
@@ -1323,8 +1460,7 @@
 
   function showControls() {
     videoControls.classList.remove('hidden');
-    videoControls.classList.add('force-show');
-    isControlsVisible = true;
+    areControlsVisible = true;
     
     if (controlsHideTimeout) clearTimeout(controlsHideTimeout);
     if (isFullscreen && video && !video.paused) {
@@ -1335,9 +1471,8 @@
   function hideControls() {
     if (!isFullscreen) return;
     
-    videoControls.classList.remove('force-show');
     videoControls.classList.add('hidden');
-    isControlsVisible = false;
+    areControlsVisible = false;
   }
 
   function initClickToggleControls() {
@@ -1345,27 +1480,7 @@
     
     videoContainer.addEventListener('click', (e) => {
       if (e.target === video || e.target.classList.contains('video-wrapper')) {
-        toggleControlsOnClick();
-      }
-    });
-    
-    videoContainer.addEventListener('click', (e) => {
-      if (e.target === video && isControlsVisible && isFullscreen) {
-        setTimeout(() => {
-          toggleControlsOnClick();
-        }, 10);
-      }
-    });
-    
-    videoContainer.addEventListener('mousemove', () => {
-      if (isFullscreen && !isControlsVisible) {
-        showControls();
-      }
-    });
-    
-    videoContainer.addEventListener('touchstart', () => {
-      if (isFullscreen && !isControlsVisible) {
-        showControls();
+        toggleControlsVisibility();
       }
     });
   }
@@ -1375,6 +1490,12 @@
     
     if (isFullscreen) {
       container.classList.add('fullscreen');
+      
+      // Mobile ??? fullscreen ???? ?? landscape mode activate ????
+      if (isMobile) {
+        lockToLandscape();
+      }
+      
       showControls();
       
       if (video && !video.paused) {
@@ -1383,7 +1504,31 @@
       }
     } else {
       container.classList.remove('fullscreen');
-      showControls();
+      
+      // Mobile ??? fullscreen ?? ???? ??? ?? orientation unlock ????
+      if (isMobile) {
+        unlockOrientation();
+        removeLandscapeFallback();
+      }
+      
+      videoControls.classList.remove('hidden');
+      areControlsVisible = true;
+    }
+  }
+
+  // ========== SCREEN ORIENTATION CHANGE HANDLER ==========
+  function handleOrientationChange() {
+    if (!isMobile) return;
+    
+    if (isFullscreen) {
+      // Fullscreen ??? ????? landscape maintain ????
+      if (window.orientation === 90 || window.orientation === -90) {
+        // Already in landscape
+        console.log('Device is in landscape mode');
+      } else {
+        // Portrait mode ??? ??, lock to landscape ????
+        lockToLandscape();
+      }
     }
   }
 
@@ -1930,10 +2075,17 @@
     
     initClickToggleControls();
     
+    // Fullscreen change listeners
     document.addEventListener('fullscreenchange', handleFullscreenChange);
     document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
     document.addEventListener('mozfullscreenchange', handleFullscreenChange);
     document.addEventListener('MSFullscreenChange', handleFullscreenChange);
+    
+    // Mobile orientation change listener
+    if (isMobile) {
+      window.addEventListener('orientationchange', handleOrientationChange);
+      window.addEventListener('resize', handleOrientationChange);
+    }
     
     if (!url) {
       container.innerHTML = "<p class='text-danger text-center'>? No video URL provided!</p>";
