@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -208,7 +208,7 @@
       pointer-events: none;
     }
 
-    /* Video controls ??? buttons ?? ??? pointer events enable */
+    /* Video controls में buttons के लिए pointer events enable */
     .video-controls .control-btn,
     .video-controls .pip-btn,
     .video-controls .audio-boost-btn,
@@ -229,7 +229,7 @@
       padding: 0.5rem 1rem;
       height: 70px;
       background: linear-gradient(to top, rgba(0,0,0,0.7), transparent);
-      opacity: 1 !important; /* Normal mode ??? ????? visible */
+      opacity: 1 !important; /* Normal mode में हमेशा visible */
       pointer-events: auto !important;
     }
 
@@ -306,7 +306,7 @@
       text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
     }
 
-    /* Normal Mode ??? ?????? ?? ??? */
+    /* Normal mode में छिपाने वाले controls */
     .video-wrapper:not(.fullscreen) .pip-btn,
     .video-wrapper:not(.fullscreen) .audio-boost-btn,
     .video-wrapper:not(.fullscreen) .playback-speed,
@@ -315,7 +315,7 @@
       display: none !important;
     }
 
-    /* Full Screen ??? ??? Controls ?????? */
+    /* Full Screen में सभी Controls दिखाएं */
     .video-wrapper.fullscreen .video-controls {
       flex-direction: column;
       padding: 1rem;
@@ -531,6 +531,7 @@
       background: var(--primary);
     }
 
+    /* Back Button - NEW POSITION */
     .back-button {
       background-color: var(--primary);
       color: white;
@@ -546,10 +547,30 @@
       position: absolute;
       top: 15px;
       left: 15px;
-      z-index: 10;
+      z-index: 100;
     }
 
     .back-button:hover {
+      background-color: var(--primary-dark);
+    }
+
+    /* Hide back button in fullscreen mode */
+    .video-wrapper.fullscreen .back-button {
+      display: none !important;
+    }
+
+    /* Show back button only in normal mode */
+    .video-wrapper:not(.fullscreen) .back-button {
+      display: flex !important;
+    }
+
+    /* Night mode styling */
+    body.night-mode .back-button {
+      background-color: var(--primary);
+      color: white;
+    }
+
+    body.night-mode .back-button:hover {
       background-color: var(--primary-dark);
     }
 
@@ -831,7 +852,7 @@
       background-color: var(--danger-dark);
     }
 
-    /* Mobile Landscape Mode */
+    /* Mobile adjustments */
     @media screen and (max-width: 768px) {
       body {
         padding: 0.5rem;
@@ -871,6 +892,13 @@
       
       .volume-slider {
         width: 60px;
+      }
+      
+      .back-button {
+        top: 10px;
+        left: 10px;
+        padding: 0.5rem 1rem;
+        font-size: 0.9rem;
       }
       
       /* Mobile fullscreen landscape mode */
@@ -949,6 +977,13 @@
         right: 0.5rem;
       }
       
+      .back-button {
+        top: 8px;
+        left: 8px;
+        padding: 0.4rem 0.8rem;
+        font-size: 0.8rem;
+      }
+      
       /* Mobile landscape mode for small screens */
       @media (orientation: landscape) {
         .video-wrapper.fullscreen {
@@ -1002,16 +1037,17 @@
         <p style="margin-top: 0.5rem; color: white; font-weight: 600;">Loading video...</p>
       </div>
       
+      <!-- Back button inside video player -->
+      <button class="back-button" onclick="goBack()" title="Back to Lectures" aria-label="Back to Lectures">
+        <i class="ri-arrow-left-line"></i> Back
+      </button>
+      
       <div id="seekAnimation" class="seek-animation" style="display: none;"></div>
       
       <div id="audioBoostIndicator" class="audio-boost-indicator">
         <i class="ri-volume-up-fill"></i>
         <span id="audioBoostValue">100%</span>
       </div>
-      
-      <button class="back-button" onclick="goBack()" title="Back to Lectures" aria-label="Back to Lectures">
-        <i class="ri-arrow-left-line"></i> Back
-      </button>
       
       <div class="video-controls" id="videoControls">
         <div class="progress-container" id="progressContainer">
@@ -1213,6 +1249,7 @@
   const audioBoostText = document.getElementById('audioBoostText');
   const audioBoostIndicator = document.getElementById('audioBoostIndicator');
   const audioBoostValue = document.getElementById('audioBoostValue');
+  const backButton = document.querySelector('.back-button');
 
   let video;
   let lastTap = 0;
@@ -1491,7 +1528,12 @@
     if (isFullscreen) {
       container.classList.add('fullscreen');
       
-      // Mobile ??? fullscreen ???? ?? landscape mode activate ????
+      // Hide back button in fullscreen mode
+      if (backButton) {
+        backButton.style.display = 'none';
+      }
+      
+      // Mobile में fullscreen होने पर landscape mode activate करें
       if (isMobile) {
         lockToLandscape();
       }
@@ -1505,7 +1547,12 @@
     } else {
       container.classList.remove('fullscreen');
       
-      // Mobile ??? fullscreen ?? ???? ??? ?? orientation unlock ????
+      // Show back button in normal mode
+      if (backButton) {
+        backButton.style.display = 'flex';
+      }
+      
+      // Mobile में fullscreen से बाहर आने पर orientation unlock करें
       if (isMobile) {
         unlockOrientation();
         removeLandscapeFallback();
@@ -1521,12 +1568,12 @@
     if (!isMobile) return;
     
     if (isFullscreen) {
-      // Fullscreen ??? ????? landscape maintain ????
+      // Fullscreen में हमेशा landscape maintain करें
       if (window.orientation === 90 || window.orientation === -90) {
         // Already in landscape
         console.log('Device is in landscape mode');
       } else {
-        // Portrait mode ??? ??, lock to landscape ????
+        // Portrait mode में है, lock to landscape करें
         lockToLandscape();
       }
     }
@@ -2088,7 +2135,7 @@
     }
     
     if (!url) {
-      container.innerHTML = "<p class='text-danger text-center'>? No video URL provided!</p>";
+      container.innerHTML = "<p class='text-danger text-center'>❌ No video URL provided!</p>";
       hideSpinner();
     } else if (url.match(/\.m3u8$/i)) {
       video = document.createElement('video');
