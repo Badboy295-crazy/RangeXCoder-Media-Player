@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+﻿﻿<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -1214,11 +1214,71 @@
   </div>
 
 <script>
+  // ========== ENHANCED URL DECODING FUNCTION ==========
+  function decodeUrlParameter(urlParam) {
+    if (!urlParam) return '';
+    
+    let decodedUrl = urlParam;
+    let previousUrl = '';
+    let maxDecodingAttempts = 10; // Prevent infinite loops
+    
+    // Keep decoding until it stops changing or we reach max attempts
+    for (let i = 0; i < maxDecodingAttempts; i++) {
+      previousUrl = decodedUrl;
+      try {
+        // Try to decode the URL
+        decodedUrl = decodeURIComponent(decodedUrl);
+        
+        // If decoding didn't change anything, we're done
+        if (decodedUrl === previousUrl) {
+          break;
+        }
+      } catch (e) {
+        // If decoding fails, break the loop
+        console.log('URL decoding failed at attempt', i + 1, ':', e.message);
+        break;
+      }
+    }
+    
+    // Clean up any remaining encoding issues
+    decodedUrl = decodedUrl.replace(/%20/g, ' ');
+    decodedUrl = decodedUrl.replace(/\+/g, ' ');
+    
+    // Remove any leading/trailing quotes
+    decodedUrl = decodedUrl.replace(/^["']|["']$/g, '');
+    
+    return decodedUrl;
+  }
+
+  // ========== MODIFIED URL PARSING ==========
   const params = new URLSearchParams(window.location.search);
   const title = params.get('title') || 'Video';
+  
+  // Get URL from parameters with enhanced decoding
   let url = params.get('url') || '';
+  
+  // Apply enhanced URL decoding
+  if (url) {
+    url = decodeUrlParameter(url);
+    
+    // Log for debugging
+    console.log('Original URL parameter:', params.get('url'));
+    console.log('Decoded URL:', url);
+    
+    // Show warning if URL still appears encoded
+    if (url.includes('%') && (url.includes('%25') || url.includes('%2F') || url.includes('%3A'))) {
+      console.warn('URL may still contain encoded characters after decoding:', url);
+    }
+  }
+  
+  // Also check for base64 encoded video parameter (keep existing functionality)
   if (!url && params.get('video')) {
-    try { url = atob(params.get('video')); } catch {}
+    try { 
+      url = atob(params.get('video')); 
+      console.log('URL decoded from base64 parameter');
+    } catch (e) {
+      console.error('Failed to decode base64 video parameter:', e);
+    }
   }
 
   const container = document.getElementById('playerContainer');
@@ -2235,5 +2295,6 @@
 
   document.addEventListener('DOMContentLoaded', initializePlayer);
 </script>
+<script src="script.js"></script>
 </body>
 </html>
